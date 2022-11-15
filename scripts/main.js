@@ -1,3 +1,20 @@
+var currentUser;
+firebase.auth().onAuthStateChanged(user => {
+    if (user) {
+        currentUser = db.collection("users").doc(user.uid);   //global
+        console.log(currentUser);
+
+        // the following functions are always called when someone is logged in
+        read_display_Quote();
+        insertName();
+        populateCardsDynamically();
+    } else {
+        // No user is signed in.
+        console.log("No user is signed in");
+        window.location.href = "login.html";
+    }
+});
+
 function read_display_Quote() {
   //console.log("inside the function")
 
@@ -10,7 +27,7 @@ function read_display_Quote() {
         tuesdayDoc.data().quote;
     });
 }
-read_display_Quote();
+//read_display_Quote();
 
 function insertName() {
   // to check if the user is logged in:
@@ -29,7 +46,7 @@ function insertName() {
 
  })
 }
-insertName();
+// insertName();
 
 function writeHikes() {
   //define a variable for the collection you want to create in Firestore to populate data
@@ -73,7 +90,11 @@ function populateCardsDynamically() {
     let hikeCardTemplate = document.getElementById("hikeCardTemplate");
     let hikeCardGroup = document.getElementById("hikeCardGroup");
     
-    db.collection("hikes").get()
+    db.collection("hikes")
+    .orderBy("last_updated")            //NEW LINE;  what do you want to sort by?
+    // .where("level","==","easy") .... Is filter.
+    .limit(2)                       //NEW LINE:  how many do you want to get?
+    .get()
         .then(allHikes => {
             allHikes.forEach(doc => {
                 var hikeName = doc.data().name; //gets the name field
@@ -83,13 +104,37 @@ function populateCardsDynamically() {
                 testHikeCard.querySelector('.card-title').innerHTML = hikeName;     //equiv getElementByClassName
                 testHikeCard.querySelector('.card-length').innerHTML = hikeLength;  //equiv getElementByClassName
                 testHikeCard.querySelector('a').onclick = () => setHikeData(hikeID);//equiv getElementByTagName
+                testHikeCard.querySelector('i').id = 'save-' + hikeID;
+                // this line will call a function to save the hikes to the user's document             
+                testHikeCard.querySelector('i').onclick = () => saveBookmark(hikeID);
                 testHikeCard.querySelector('img').src = `./images/${hikeID}.jpg`;   //equiv getElementByTagName
+                testHikeCard.querySelector('.read-more').href = "eachHike.html?hikeName="+hikeName +"&id=" + hikeID;
                 hikeCardGroup.appendChild(testHikeCard);
             })
 
         })
 }
-populateCardsDynamically();
+
+//-----------------------------------------------------------------------------
+// This function is called whenever the user clicks on the "bookmark" icon.
+// It adds the hike to the "bookmarks" array
+// Then it will change the bookmark icon from the hollow to the solid version. 
+//-----------------------------------------------------------------------------
+function saveBookmark(hikeID) {
+  currentUser.set({
+          bookmarks: firebase.firestore.FieldValue.arrayUnion(hikeID)
+      }, {
+          merge: true
+      })
+      .then(function () {
+          console.log("bookmark has been saved for: " + currentUser);
+          var iconID = 'save-' + hikeID;
+          //console.log(iconID);
+          //this is to change the icon of the hike that was saved to "filled"
+          document.getElementById(iconID).innerText = 'bookmark';
+      });
+}
+//populateCardsDynamically();
 
 function setHikeData(id){
     localStorage.setItem ('hikeID', id);
